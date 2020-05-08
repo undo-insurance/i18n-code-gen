@@ -16,42 +16,54 @@ use crossterm::{
 };
 use lokalise_client::{LokaliseClient, Project};
 use std::io::{self, Write};
+use std::process::exit;
 use tokio::task;
 use tokio::time::delay_for;
-use tokio::time::Duration;
+use tokio::{runtime::Runtime, time::Duration};
 
-#[tokio::main]
-async fn main() {
-    let task = async {
-        ctrlc::set_handler(move || {
-            execute!(io::stderr(), Show).ok();
-            std::process::exit(1);
-        })
-        .expect("Error setting Ctrl-C handler");
-
-        show_spinner();
-
-        let client = LokaliseClient::new();
-
-        let project = find_undo_project(&client).await?;
-        let keys = client.keys(&project).await?;
-
-        let code = generate_code(keys)?;
-        execute!(io::stderr(), Clear(ClearType::CurrentLine))?;
-        println!("{}", code);
-
+fn main() -> Result<()> {
+    let result = std::panic::catch_unwind(|| {
+        Runtime::new()?.block_on(async_main())?;
         Result::<_>::Ok(())
-    };
+    });
 
-    let result = task.await;
     execute!(io::stderr(), Show).ok();
+
     match result {
-        Ok(()) => {}
-        Err(err) => {
-            eprintln!("{}", err);
-            std::process::exit(1);
+        Ok(ok) => match ok {
+            Ok(()) => {}
+            Err(err) => {
+                eprintln!("{}", err);
+                exit(1);
+            }
+        },
+        Err(_panic_err) => {
+            exit(1);
         }
     }
+
+    Ok(())
+}
+
+async fn async_main() -> Result<()> {
+    ctrlc::set_handler(move || {
+        execute!(io::stderr(), Show).ok();
+        std::process::exit(1);
+    })
+    .expect("Error setting Ctrl-C handler");
+
+    show_spinner();
+
+    let client = LokaliseClient::new();
+
+    let project = find_undo_project(&client).await?;
+    let keys = client.keys(&project).await?;
+
+    let code = generate_code(keys)?;
+    execute!(io::stderr(), Clear(ClearType::CurrentLine))?;
+    println!("{}", code);
+
+    Result::<_>::Ok(())
 }
 
 async fn find_undo_project(client: &LokaliseClient) -> Result<Project> {
@@ -78,7 +90,6 @@ fn show_spinner() {
                 io::stderr(),
                 Hide,
                 SavePosition,
-                Print("Talking to Lokalise... "),
                 Print(states[state - 1]),
                 RestorePosition,
             )?;

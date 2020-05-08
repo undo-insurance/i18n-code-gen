@@ -394,6 +394,7 @@ dependencies = [
  "futures",
  "heck",
  "itertools",
+ "lazy_static",
  "regex",
  "reqwest",
  "serde",

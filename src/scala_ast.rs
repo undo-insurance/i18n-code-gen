@@ -103,6 +103,9 @@ pub enum Expr {
         value: String,
         interpolate: bool,
     },
+    Var {
+        name: Ident,
+    }
 }
 
 impl ToCode for Expr {
@@ -147,6 +150,9 @@ impl ToCode for Expr {
                         }
                     }
                 }
+            },
+            Expr::Var { name } => {
+                name.to_code(out, indent);
             }
         }
     }

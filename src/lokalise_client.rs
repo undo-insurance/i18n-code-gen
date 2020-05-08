@@ -94,6 +94,7 @@ pub struct Key {
     pub key_id: i32,
     pub key_name: KeyName,
     pub translations: Vec<Translation>,
+    pub is_plural: bool,
 }
 
 #[derive(Debug, Deserialize)]
