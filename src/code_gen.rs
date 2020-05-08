@@ -3,6 +3,7 @@ use crate::scala_ast::*;
 use anyhow::{Error, Result};
 use heck::CamelCase;
 use heck::TitleCase;
+use heck::MixedCase;
 use regex::Regex;
 use serde::Deserialize;
 use std::collections::HashSet;
@@ -126,7 +127,7 @@ fn translation_method_with_cardinality(key: &Key) -> Result<MethodDef> {
         .collect::<Result<Vec<_>>>()?;
 
     Ok(MethodDef {
-        name: Ident::new(&key.key_name.ios.to_camel_case()),
+        name: Ident::new(&key.key_name.ios.to_mixed_case()),
         params: method_params,
         implicit_params: vec![Param {
             name: Ident::new("locale"),
@@ -161,7 +162,7 @@ fn translation_method_without_cardinality(key: &Key) -> Result<MethodDef> {
         .collect::<Vec<_>>();
 
     Ok(MethodDef {
-        name: Ident::new(&key.key_name.ios.to_camel_case()),
+        name: Ident::new(&key.key_name.ios.to_mixed_case()),
         params: method_params,
         implicit_params: vec![Param {
             name: Ident::new("locale"),

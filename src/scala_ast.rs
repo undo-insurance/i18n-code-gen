@@ -175,7 +175,7 @@ impl ToCode for MatchClause {
     fn to_code(&self, out: &mut String, indent: usize) {
         writeln!(out, indent, "case {} => {{", self.pattern);
         self.expr.to_code(out, indent + 2);
-        writeln!(out, 0, "\n");
+        write!(out, 0, "\n");
         writeln!(out, indent, "}}");
     }
 }
@@ -296,7 +296,7 @@ impl ToCode for MethodDef {
 
         writeln!(out, 0, ": {} = {{", self.return_type);
         self.body.to_code(out, indent + 2);
-        writeln!(out, indent, "}}");
+        write!(out, indent, "}}");
     }
 }
 
@@ -410,9 +410,18 @@ impl ToCode for Item {
                         write!(out, 0, "\n");
                     }
 
-                    for method in methods {
-                        method.to_code(out, indent + 2);
+                    for method in methods.iter().with_position() {
+                        match method {
+                            Position::First(method) | Position::Middle(method) => {
+                                method.to_code(out, indent + 2);
+                                writeln!(out, 0, "\n")
+                            }
+                            Position::Last(method) | Position::Only(method) => {
+                                method.to_code(out, indent + 2);
+                            }
+                        }
                     }
+
 
                     write!(out, 0, "\n");
                     write!(out, indent, "}}");
