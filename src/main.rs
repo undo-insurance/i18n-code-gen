@@ -8,6 +8,7 @@ mod scala_ast;
 use anyhow::{Error, Result};
 use code_gen::generate_code;
 use crossterm::cursor::{Hide, MoveTo, RestorePosition, SavePosition, Show};
+use crossterm::style::{Color, SetForegroundColor, ResetColor};
 use crossterm::{
     execute,
     style::Print,
@@ -21,7 +22,7 @@ use tokio::time::Duration;
 
 #[tokio::main]
 async fn main() {
-    let task = task::spawn(async {
+    let task = async {
         ctrlc::set_handler(move || {
             execute!(io::stderr(), Show).ok();
             std::process::exit(1);
@@ -39,22 +40,14 @@ async fn main() {
         println!("{}", code);
 
         Result::<_>::Ok(())
-    });
+    };
 
-    match task.await {
-        Ok(Ok(())) => {
-            execute!(io::stderr(), Show).ok();
-        }
-        Ok(Err(err)) => {
-            execute!(io::stderr(), Show).ok();
-
-            eprintln!("{}", err);
-            std::process::exit(1);
-        }
+    let result = task.await;
+    execute!(io::stderr(), Show).ok();
+    match result {
+        Ok(()) => {}
         Err(err) => {
-            execute!(io::stderr(), Show).ok();
-
-            eprintln!("Error joining task: {}", err);
+            eprintln!("{}", err);
             std::process::exit(1);
         }
     }
@@ -73,18 +66,28 @@ async fn find_undo_project(client: &LokaliseClient) -> Result<Project> {
 #[allow(unreachable_code)]
 fn show_spinner() {
     task::spawn(async move {
-        let states = ["|-    |", "| -   |", "|  -  |", "|   - |", "|    -|"];
+        let states = ["-    ", " -   ", "  -  ", "   - ", "    -"];
 
         let mut state = 0;
         let mut up = true;
         let mut delay = 80;
 
         loop {
+            let color = if delay >= 50 {
+                Color::Green
+            } else if delay >= 30 {
+                Color::Yellow
+            } else {
+                Color::Red
+            };
+
             execute!(
                 io::stderr(),
                 Hide,
                 SavePosition,
+                SetForegroundColor(color),
                 Print(states[state]),
+                ResetColor,
                 RestorePosition,
             )?;
 
