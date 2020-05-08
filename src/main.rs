@@ -8,7 +8,7 @@ mod scala_ast;
 use anyhow::{Error, Result};
 use code_gen::generate_code;
 use crossterm::cursor::{Hide, MoveTo, RestorePosition, SavePosition, Show};
-use crossterm::style::{Color, SetForegroundColor, ResetColor};
+use crossterm::style::{Color, ResetColor, SetForegroundColor};
 use crossterm::{
     execute,
     style::Print,
@@ -37,6 +37,7 @@ async fn main() {
         let keys = client.keys(&project).await?;
 
         let code = generate_code(keys)?;
+        execute!(io::stderr(), Clear(ClearType::CurrentLine))?;
         println!("{}", code);
 
         Result::<_>::Ok(())
@@ -66,54 +67,35 @@ async fn find_undo_project(client: &LokaliseClient) -> Result<Project> {
 #[allow(unreachable_code)]
 fn show_spinner() {
     task::spawn(async move {
-        let states = ["-    ", " -   ", "  -  ", "   - ", "    -"];
+        let states = ["|", "/", "-", "\\", "|", "/", "-", "\\"];
 
-        let mut state = 0;
+        let mut state = 1;
         let mut up = true;
-        let mut delay = 80;
+        let delay = 80;
 
         loop {
-            let color = if delay >= 50 {
-                Color::Green
-            } else if delay >= 30 {
-                Color::Yellow
-            } else {
-                Color::Red
-            };
-
             execute!(
                 io::stderr(),
                 Hide,
                 SavePosition,
-                SetForegroundColor(color),
-                Print(states[state]),
-                ResetColor,
+                Print("Talking to Lokalise... "),
+                Print(states[state - 1]),
                 RestorePosition,
             )?;
 
-            match (up, state) {
-                (_, 0) => {
-                    state += 1;
-                    up = true;
-                }
-
-                (true, 1) | (true, 2) | (true, 3) => {
-                    state += 1;
-                }
-                (false, 1) | (false, 2) | (false, 3) => {
-                    state -= 1;
-                }
-
-                (_, 4) => {
-                    state -= 1;
-                    up = false;
-                }
-                _ => panic!("invalid state {}", state),
+            if state == 1 {
+                state += 1;
+                up = true;
+            } else if state == states.len() {
+                state -= 1;
+                up = false;
+            } else if up {
+                state += 1;
+            } else {
+                state -= 1;
             }
 
             delay_for(Duration::from_millis(delay)).await;
-            delay = delay.checked_sub(1).unwrap_or(1).max(20);
-
             execute!(io::stderr(), Clear(ClearType::CurrentLine))?;
         }
         Result::<_>::Ok(())
