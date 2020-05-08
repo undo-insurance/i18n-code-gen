@@ -3,14 +3,60 @@ use std::cell::RefCell;
 use std::fmt::Write;
 
 macro_rules! write {
-    ($($tt:tt)*) => {
-        std::write!( $($tt)* ).unwrap()
+    (
+        $out:expr,
+        $indent:expr,
+        $format_str:expr,
+        $($args:tt)*
+    ) => {
+        std::write!(
+            $out,
+            "{}{}",
+            spaces($indent),
+            std::format!($format_str, $($args)*)
+        ).unwrap()
+    };
+
+    (
+        $out:expr,
+        $indent:expr,
+        $format_str:expr
+    ) => {
+        std::write!(
+            $out,
+            "{}{}",
+            spaces($indent),
+            std::format!($format_str)
+        ).unwrap()
     };
 }
 
 macro_rules! writeln {
-    ($($tt:tt)*) => {
-        std::writeln!( $($tt)* ).unwrap()
+    (
+        $out:expr,
+        $indent:expr,
+        $format_str:expr,
+        $($args:tt)*
+    ) => {
+        std::writeln!(
+            $out,
+            "{}{}",
+            spaces($indent),
+            std::format!($format_str, $($args)*)
+        ).unwrap()
+    };
+
+    (
+        $out:expr,
+        $indent:expr,
+        $format_str:expr
+    ) => {
+        std::writeln!(
+            $out,
+            "{}{}",
+            spaces($indent),
+            std::format!($format_str)
+        ).unwrap()
     };
 }
 
@@ -40,9 +86,9 @@ impl Ident {
 impl ToCode for Ident {
     fn to_code(&self, out: &mut String, indent: usize) {
         if is_keyword(&self.name) {
-            write!(out, "{}`{}`", spaces(indent), self.name)
+            write!(out, indent, "`{}`", self.name)
         } else {
-            write!(out, "{}{}", spaces(indent), self.name)
+            write!(out, indent, "{}", self.name)
         }
     }
 }
@@ -64,11 +110,11 @@ impl ToCode for Expr {
         match self {
             Expr::Match { expr, clauses } => {
                 expr.to_code(out, indent);
-                writeln!(out, " match {{");
+                writeln!(out, 0, " match {{");
                 for clause in clauses {
                     clause.to_code(out, indent + 2);
                 }
-                writeln!(out, "{}}}", spaces(indent));
+                writeln!(out, indent, "}}");
             }
             Expr::StrLit { value, interpolate } => {
                 for line in value.split('\n').with_position() {
@@ -78,8 +124,8 @@ impl ToCode for Expr {
                         Position::Only(line) => {
                             write!(
                                 out,
-                                "{indent}{s}\"\"\"{value}\"\"\"",
-                                indent = spaces(indent),
+                                indent,
+                                "{s}\"\"\"{value}\"\"\"",
                                 s = start,
                                 value = line
                             );
@@ -87,17 +133,17 @@ impl ToCode for Expr {
                         Position::First(line) => {
                             write!(
                                 out,
-                                "{indent}{s}\"\"\"{value}\n",
-                                indent = spaces(indent),
+                                indent,
+                                "{s}\"\"\"{value}\n",
                                 s = start,
                                 value = line
                             );
                         }
                         Position::Middle(line) => {
-                            write!(out, "{}\n", line);
+                            write!(out, 0, "{}\n", line);
                         }
                         Position::Last(line) => {
-                            write!(out, "{}\"\"\"", line);
+                            write!(out, 0, "{}\"\"\"", line);
                         }
                     }
                 }
@@ -114,9 +160,10 @@ pub struct MatchClause {
 
 impl ToCode for MatchClause {
     fn to_code(&self, out: &mut String, indent: usize) {
-        writeln!(out, "{}case {} => {{", spaces(indent), self.pattern);
+        writeln!(out, indent, "case {} => {{", self.pattern);
         self.expr.to_code(out, indent + 2);
-        writeln!(out, "\n{}}}", spaces(indent));
+        writeln!(out, 0, "\n");
+        writeln!(out, indent, "}}");
     }
 }
 
@@ -182,7 +229,7 @@ pub struct Param {
 impl ToCode for Param {
     fn to_code(&self, out: &mut String, indent: usize) {
         self.name.to_code(out, indent);
-        write!(out, ": {}", self.ty);
+        write!(out, 0, ": {}", self.ty);
     }
 }
 
@@ -199,27 +246,27 @@ pub struct MethodDef {
 impl ToCode for MethodDef {
     fn to_code(&self, out: &mut String, indent: usize) {
         if let Some(comment) = &self.comment {
-            writeln!(out, "{}// {}", spaces(indent), comment);
+            writeln!(out, indent, "// {}", comment);
         }
 
-        write!(out, "{}def ", spaces(indent));
+        write!(out, indent, "def ");
         self.name.to_code(out, 0);
 
         if !self.params.is_empty() {
-            write!(out, "(");
+            write!(out, 0, "(");
             self.params.to_code(out, 0);
-            write!(out, ")");
+            write!(out, 0, ")");
         }
 
         if !self.implicit_params.is_empty() {
-            write!(out, "(implicit ");
+            write!(out, 0, "(implicit ");
             self.implicit_params.to_code(out, 0);
-            write!(out, ")");
+            write!(out, 0, ")");
         }
 
-        writeln!(out, ": {} = {{", self.return_type);
+        writeln!(out, 0, ": {} = {{", self.return_type);
         self.body.to_code(out, indent + 2);
-        writeln!(out, "{}}}", spaces(indent));
+        writeln!(out, indent, "}}");
     }
 }
 
@@ -230,7 +277,7 @@ impl ToCode for Vec<Param> {
                 Position::Only(param) | Position::Last(param) => param.to_code(out, 0),
                 Position::First(param) | Position::Middle(param) => {
                     param.to_code(out, 0);
-                    write!(out, ", ");
+                    write!(out, 0, ", ");
                 }
             }
         }
@@ -252,7 +299,7 @@ impl ToCode for TopLevel {
             match item {
                 Position::First(item) | Position::Middle(item) => {
                     item.to_code(out, indent);
-                    write!(out, "\n\n")
+                    write!(out, 0, "\n\n")
                 }
                 Position::Last(item) | Position::Only(item) => item.to_code(out, indent),
             }
@@ -282,12 +329,12 @@ impl ToCode for Item {
     fn to_code(&self, out: &mut String, indent: usize) {
         match self {
             Item::Package { segments } => {
-                write!(out, "{}package ", spaces(indent));
+                write!(out, indent, "package ");
                 for segment in segments.iter().with_position() {
                     match segment {
                         Position::First(segment) | Position::Middle(segment) => {
                             segment.to_code(out, 0);
-                            write!(out, ".")
+                            write!(out, 0, ".")
                         }
                         Position::Last(segment) | Position::Only(segment) => {
                             segment.to_code(out, 0)
@@ -301,25 +348,26 @@ impl ToCode for Item {
                 name,
                 items,
                 methods,
-                super_type
+                super_type,
             } => {
-                write!(out, "{}", spaces(indent));
+                write!(out, indent, "");
                 if *case {
-                    write!(out, "case ");
+                    write!(out, 0, "case ");
                 }
-                write!(out, "object {}", name);
+                write!(out, 0, "object {}", name);
 
                 if let Some(super_type) = super_type {
-                    write!(out, " extends {}", super_type);
+                    write!(out, 0, " extends {}", super_type);
                 }
 
                 if !items.is_empty() || !methods.is_empty() {
-                    writeln!(out, " {{");
+                    writeln!(out, 0, " {{");
+
                     for item in items.iter().with_position() {
                         match item {
                             Position::First(item) | Position::Middle(item) => {
                                 item.to_code(out, indent + 2);
-                                write!(out, "\n")
+                                writeln!(out, 0, "\n")
                             }
                             Position::Last(item) | Position::Only(item) => {
                                 item.to_code(out, indent + 2);
@@ -328,23 +376,24 @@ impl ToCode for Item {
                     }
 
                     if !items.is_empty() && !methods.is_empty() {
-                        write!(out, "\n");
+                        write!(out, 0, "\n");
                     }
 
                     for method in methods {
                         method.to_code(out, indent + 2);
                     }
 
-                    write!(out, "{}\n}}", spaces(indent));
+                    write!(out, 0, "\n");
+                    write!(out, indent, "}}");
                 }
             }
 
             Item::Trait { name, sealed } => {
-                write!(out, "{}", spaces(indent));
+                write!(out, indent, "");
                 if *sealed {
-                    write!(out, "sealed ");
+                    write!(out, 0, "sealed ");
                 }
-                write!(out, "trait {}", name);
+                write!(out, 0, "trait {}", name);
             }
         }
     }
