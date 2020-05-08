@@ -1,6 +1,3 @@
-#[doc(inline)]
-pub use std;
-
 mod code_gen;
 mod lokalise_client;
 mod scala_ast;
@@ -8,9 +5,9 @@ mod scala_ast;
 use anyhow::{Error, Result};
 use code_gen::generate_code;
 use crossterm::{
-    cursor::{Hide, MoveTo, RestorePosition, SavePosition, Show},
+    cursor::{Hide, RestorePosition, SavePosition, Show},
     execute,
-    style::{Color, Print, ResetColor, SetForegroundColor},
+    style::Print,
     terminal::{Clear, ClearType},
 };
 use lokalise_client::{LokaliseClient, Project};
@@ -21,7 +18,7 @@ use std::{
 };
 use tokio::{
     fs::File,
-    io::{AsyncWrite, AsyncWriteExt},
+    io::AsyncWriteExt,
     runtime::Runtime,
     task,
     time::{delay_for, Duration},

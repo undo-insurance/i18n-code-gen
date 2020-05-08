@@ -1,7 +1,4 @@
-use crate::{
-    lokalise_client::{Key, KeyName, LokaliseClient, Project, Translation},
-    scala_ast::*,
-};
+use crate::{lokalise_client::Key, scala_ast::*};
 use anyhow::{Error, Result};
 use heck::{CamelCase, MixedCase, TitleCase};
 use regex::Regex;
