@@ -112,7 +112,7 @@ pub enum Expr {
     },
     Var {
         name: Ident,
-    }
+    },
 }
 
 impl ToCode for Expr {
@@ -141,13 +141,7 @@ impl ToCode for Expr {
                             );
                         }
                         Position::First(line) => {
-                            write!(
-                                out,
-                                indent,
-                                "{s}\"\"\"{value}\n",
-                                s = start,
-                                value = line
-                            );
+                            write!(out, indent, "{s}\"\"\"{value}\n", s = start, value = line);
                         }
                         Position::Middle(line) => {
                             write!(out, 0, "{}\n", line);
@@ -157,7 +151,7 @@ impl ToCode for Expr {
                         }
                     }
                 }
-            },
+            }
             Expr::Var { name } => {
                 name.to_code(out, indent);
             }
@@ -253,7 +247,9 @@ pub struct Comment {
 
 impl Comment {
     pub fn new(text: &str) -> Self {
-        Self { text: text.to_string() }
+        Self {
+            text: text.to_string(),
+        }
     }
 }
 
@@ -421,7 +417,6 @@ impl ToCode for Item {
                             }
                         }
                     }
-
 
                     write!(out, 0, "\n");
                     write!(out, indent, "}}");

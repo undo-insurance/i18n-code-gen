@@ -2,8 +2,8 @@ use crate::lokalise_client::{Key, KeyName, LokaliseClient, Project, Translation}
 use crate::scala_ast::*;
 use anyhow::{Error, Result};
 use heck::CamelCase;
-use heck::TitleCase;
 use heck::MixedCase;
+use heck::TitleCase;
 use regex::Regex;
 use serde::Deserialize;
 use std::collections::HashSet;
@@ -58,11 +58,16 @@ fn locale_enum_variants(keys: &[Key]) -> Vec<Item> {
         .collect()
 }
 
-fn find_locales(keys: &[Key]) -> HashSet<&str> {
-    keys.into_iter()
+fn find_locales(keys: &[Key]) -> Vec<&str> {
+    let mut names = keys
+        .into_iter()
         .flat_map(|key| &key.translations)
         .map(|translation| translation.language_iso.as_str())
-        .collect()
+        .collect::<HashSet<_>>()
+        .into_iter()
+        .collect::<Vec<_>>();
+    names.sort();
+    names
 }
 
 fn translation_methods(keys: &[Key]) -> Result<Vec<MethodDef>> {

@@ -41,7 +41,7 @@ impl LokaliseClient {
             keys: Vec<Key>,
         }
 
-        let pagination_per_page = 5000;
+        let per_page = 5000;
         let mut page = 1;
 
         let mut keys = vec![];
@@ -52,15 +52,16 @@ impl LokaliseClient {
                 .append_pair("include_translations", "1");
             url.query_pairs_mut().append_pair("page", &page.to_string());
             url.query_pairs_mut()
-                .append_pair("limit", &pagination_per_page.to_string());
+                .append_pair("limit", &per_page.to_string());
 
             let resp = self.req::<Keys>(url).await?;
 
-            if resp.keys.is_empty() {
+            page += 1;
+            let keys_len = resp.keys.len();
+            keys.extend(resp.keys);
+
+            if keys_len < per_page {
                 break;
-            } else {
-                page += 1;
-                keys.extend(resp.keys);
             }
         }
 
