@@ -1,4 +1,5 @@
 use itertools::{Itertools, Position};
+use regex::Regex;
 use std::cell::RefCell;
 use std::fmt::Write;
 
@@ -85,7 +86,13 @@ impl Ident {
 
 impl ToCode for Ident {
     fn to_code(&self, out: &mut String, indent: usize) {
-        if is_keyword(&self.name) {
+        lazy_static::lazy_static! {
+            static ref LEADING_DIGIT: Regex = Regex::new(
+                r#"^\d"#
+            ).unwrap();
+        }
+
+        if is_keyword(&self.name) || LEADING_DIGIT.is_match(&self.name) {
             write!(out, indent, "`{}`", self.name)
         } else {
             write!(out, indent, "{}", self.name)
@@ -240,19 +247,36 @@ impl ToCode for Param {
 }
 
 #[derive(Debug)]
+pub struct Comment {
+    pub text: String,
+}
+
+impl Comment {
+    pub fn new(text: &str) -> Self {
+        Self { text: text.to_string() }
+    }
+}
+
+impl ToCode for Comment {
+    fn to_code(&self, out: &mut String, indent: usize) {
+        writeln!(out, indent, "// {}", self.text);
+    }
+}
+
+#[derive(Debug)]
 pub struct MethodDef {
     pub name: Ident,
     pub params: Vec<Param>,
     pub implicit_params: Vec<Param>,
     pub return_type: String,
     pub body: Expr,
-    pub comment: Option<String>,
+    pub comment: Option<Comment>,
 }
 
 impl ToCode for MethodDef {
     fn to_code(&self, out: &mut String, indent: usize) {
         if let Some(comment) = &self.comment {
-            writeln!(out, indent, "// {}", comment);
+            comment.to_code(out, indent);
         }
 
         write!(out, indent, "def ");
@@ -329,6 +353,7 @@ pub enum Item {
         name: String,
         sealed: bool,
     },
+    Comment(Comment),
 }
 
 impl ToCode for Item {
@@ -400,6 +425,10 @@ impl ToCode for Item {
                     write!(out, 0, "sealed ");
                 }
                 write!(out, 0, "trait {}", name);
+            }
+
+            Item::Comment(comment) => {
+                comment.to_code(out, indent);
             }
         }
     }

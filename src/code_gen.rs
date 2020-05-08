@@ -12,6 +12,7 @@ pub fn generate_code(keys: Vec<Key>) -> Result<String> {
     let mut items = hardcoded_items();
 
     items.extend(vec![
+        Item::Comment(Comment::new("format: off")),
         Item::Trait {
             name: "Locale".to_string(),
             sealed: true,
@@ -26,13 +27,16 @@ pub fn generate_code(keys: Vec<Key>) -> Result<String> {
     ]);
 
     let methods = translation_methods(&keys)?;
-    items.push(Item::Object {
-        case: false,
-        name: "I18n".to_string(),
-        items: vec![],
-        methods,
-        super_type: None,
-    });
+    items.extend(vec![
+        Item::Object {
+            case: false,
+            name: "I18n".to_string(),
+            items: vec![],
+            methods,
+            super_type: None,
+        },
+        Item::Comment(Comment::new("format: off")),
+    ]);
 
     let ast = TopLevel { items };
     Ok(to_code(ast))
@@ -135,7 +139,7 @@ fn translation_method_with_cardinality(key: &Key) -> Result<MethodDef> {
             clauses: locale_match_clauses,
         },
         return_type: "String".to_string(),
-        comment: Some(key.key_name.ios.to_string()),
+        comment: Some(Comment::new(&key.key_name.ios)),
     })
 }
 
@@ -170,7 +174,7 @@ fn translation_method_without_cardinality(key: &Key) -> Result<MethodDef> {
             clauses: locale_match_clauses,
         },
         return_type: "String".to_string(),
-        comment: Some(key.key_name.ios.to_string()),
+        comment: Some(Comment::new(&key.key_name.ios)),
     })
 }
 

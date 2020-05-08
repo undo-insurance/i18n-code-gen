@@ -5,6 +5,10 @@ mod code_gen;
 mod lokalise_client;
 mod scala_ast;
 
+use tokio::fs::File;
+use tokio::io::AsyncWrite;
+use tokio::io::AsyncWriteExt;
+use std::path::Path;
 use anyhow::{Error, Result};
 use code_gen::generate_code;
 use crossterm::cursor::{Hide, MoveTo, RestorePosition, SavePosition, Show};
@@ -61,7 +65,10 @@ async fn async_main() -> Result<()> {
 
     let code = generate_code(keys)?;
     execute!(io::stderr(), Clear(ClearType::CurrentLine))?;
-    println!("{}", code);
+
+    let path = Path::new("shared/src/main/scala/dk/undo/i18n/I18n.scala");
+    let mut file = File::create(path).await?;
+    file.write_all(code.as_bytes()).await?;
 
     Result::<_>::Ok(())
 }
