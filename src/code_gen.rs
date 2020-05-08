@@ -1,13 +1,12 @@
-use crate::lokalise_client::{Key, KeyName, LokaliseClient, Project, Translation};
-use crate::scala_ast::*;
+use crate::{
+    lokalise_client::{Key, KeyName, LokaliseClient, Project, Translation},
+    scala_ast::*,
+};
 use anyhow::{Error, Result};
-use heck::CamelCase;
-use heck::MixedCase;
-use heck::TitleCase;
+use heck::{CamelCase, MixedCase, TitleCase};
 use regex::Regex;
 use serde::Deserialize;
-use std::collections::HashSet;
-use std::str::FromStr;
+use std::{collections::HashSet, str::FromStr};
 
 pub fn generate_code(keys: Vec<Key>) -> Result<String> {
     let mut items = hardcoded_items();

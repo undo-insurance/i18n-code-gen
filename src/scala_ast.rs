@@ -1,7 +1,6 @@
 use itertools::{Itertools, Position};
 use regex::Regex;
-use std::cell::RefCell;
-use std::fmt::Write;
+use std::{cell::RefCell, fmt::Write};
 
 macro_rules! write {
     (

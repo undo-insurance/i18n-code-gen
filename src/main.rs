@@ -7,23 +7,25 @@ mod scala_ast;
 
 use anyhow::{Error, Result};
 use code_gen::generate_code;
-use crossterm::cursor::{Hide, MoveTo, RestorePosition, SavePosition, Show};
-use crossterm::style::{Color, ResetColor, SetForegroundColor};
 use crossterm::{
+    cursor::{Hide, MoveTo, RestorePosition, SavePosition, Show},
     execute,
-    style::Print,
+    style::{Color, Print, ResetColor, SetForegroundColor},
     terminal::{Clear, ClearType},
 };
 use lokalise_client::{LokaliseClient, Project};
-use std::io::{self, Write};
-use std::path::Path;
-use std::process::exit;
-use tokio::fs::File;
-use tokio::io::AsyncWrite;
-use tokio::io::AsyncWriteExt;
-use tokio::task;
-use tokio::time::delay_for;
-use tokio::{runtime::Runtime, time::Duration};
+use std::{
+    io::{self, Write},
+    path::Path,
+    process::exit,
+};
+use tokio::{
+    fs::File,
+    io::{AsyncWrite, AsyncWriteExt},
+    runtime::Runtime,
+    task,
+    time::{delay_for, Duration},
+};
 
 fn main() -> Result<()> {
     let result = std::panic::catch_unwind(|| {
