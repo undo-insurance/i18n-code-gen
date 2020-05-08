@@ -20,26 +20,44 @@ use tokio::time::delay_for;
 use tokio::time::Duration;
 
 #[tokio::main]
-async fn main() -> Result<()> {
-    ctrlc::set_handler(move || {
-        execute!(io::stderr(), Show).ok();
-        std::process::exit(1);
-    })
-    .expect("Error setting Ctrl-C handler");
+async fn main() {
+    let task = task::spawn(async {
+        ctrlc::set_handler(move || {
+            execute!(io::stderr(), Show).ok();
+            std::process::exit(1);
+        })
+        .expect("Error setting Ctrl-C handler");
 
-    show_spinner();
+        show_spinner();
 
-    let client = LokaliseClient::new();
+        let client = LokaliseClient::new();
 
-    let project = find_undo_project(&client).await?;
-    let keys = client.keys(&project).await?;
+        let project = find_undo_project(&client).await?;
+        let keys = client.keys(&project).await?;
 
-    execute!(io::stderr(), Show)?;
+        let code = generate_code(keys)?;
+        println!("{}", code);
 
-    let code = generate_code(keys)?;
-    println!("{}", code);
+        Result::<_>::Ok(())
+    });
 
-    Ok(())
+    match task.await {
+        Ok(Ok(())) => {
+            execute!(io::stderr(), Show).ok();
+        }
+        Ok(Err(err)) => {
+            execute!(io::stderr(), Show).ok();
+
+            eprintln!("{}", err);
+            std::process::exit(1);
+        }
+        Err(err) => {
+            execute!(io::stderr(), Show).ok();
+
+            eprintln!("Error joining task: {}", err);
+            std::process::exit(1);
+        }
+    }
 }
 
 async fn find_undo_project(client: &LokaliseClient) -> Result<Project> {
@@ -59,6 +77,7 @@ fn show_spinner() {
 
         let mut state = 0;
         let mut up = true;
+        let mut delay = 80;
 
         loop {
             execute!(
@@ -89,7 +108,8 @@ fn show_spinner() {
                 _ => panic!("invalid state {}", state),
             }
 
-            delay_for(Duration::from_millis(66)).await;
+            delay_for(Duration::from_millis(delay)).await;
+            delay = delay.checked_sub(1).unwrap_or(1).max(20);
 
             execute!(io::stderr(), Clear(ClearType::CurrentLine))?;
         }
