@@ -11,13 +11,15 @@ use crossterm::{
     terminal::{Clear, ClearType},
 };
 use lokalise_client::{LokaliseClient, Project};
+use std::ffi::OsStr;
 use std::{
     io::{self, Write},
-    path::Path,
+    path::{Path, PathBuf},
     process::exit,
 };
+use tokio::stream::StreamExt;
 use tokio::{
-    fs::File,
+    fs::{self, File},
     io::AsyncWriteExt,
     runtime::Runtime,
     task,
@@ -65,11 +67,47 @@ async fn async_main() -> Result<()> {
     let code = generate_code(keys)?;
     execute!(io::stderr(), Clear(ClearType::CurrentLine))?;
 
-    let path = Path::new("shared/src/main/scala/dk/undo/i18n/I18n.scala");
+    let path = path_to_write_to().await?.join("shared/src/main/scala/dk/undo/i18n/I18n.scala");
     let mut file = File::create(path).await?;
     file.write_all(code.as_bytes()).await?;
 
     Result::<_>::Ok(())
+}
+
+async fn path_to_write_to() -> Result<PathBuf> {
+    for path in std::env::current_dir()?.ancestors() {
+        if is_root_of_backend(path).await? {
+            return Ok(PathBuf::from(path));
+        }
+    }
+
+    Err(Error::msg(
+        "Could not find root of backend project from parents of current dir",
+    ))
+}
+
+async fn is_root_of_backend(path: &Path) -> Result<bool> {
+    let mut dir_conents = fs::read_dir(path).await?;
+
+    let mut contains_git = false;
+    let mut contains_build_sbt = false;
+
+    let git_file = Some(OsStr::new(".git"));
+    let build_sbt_file = Some(OsStr::new("build.sbt"));
+
+    while let Some(path_in_dir) = dir_conents.next().await {
+        let path_in_dir = path_in_dir?.path();
+
+        if path_in_dir.file_name() == git_file {
+            contains_git = true
+        }
+
+        if path_in_dir.file_name() == build_sbt_file {
+            contains_build_sbt = true;
+        }
+    }
+
+    Ok(contains_git && contains_build_sbt)
 }
 
 async fn find_undo_project(client: &LokaliseClient) -> Result<Project> {
