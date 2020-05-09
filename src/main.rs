@@ -51,6 +51,9 @@ fn main() -> Result<()> {
 }
 
 async fn async_main() -> Result<()> {
+    let path = path_to_write_to().await?.join("shared/src/main/scala/dk/undo/i18n/I18n.scala");
+    let mut file = File::create(path).await?;
+
     ctrlc::set_handler(move || {
         execute!(io::stderr(), Show).ok();
         std::process::exit(1);
@@ -67,8 +70,6 @@ async fn async_main() -> Result<()> {
     let code = generate_code(keys)?;
     execute!(io::stderr(), Clear(ClearType::CurrentLine))?;
 
-    let path = path_to_write_to().await?.join("shared/src/main/scala/dk/undo/i18n/I18n.scala");
-    let mut file = File::create(path).await?;
     file.write_all(code.as_bytes()).await?;
 
     Result::<_>::Ok(())
