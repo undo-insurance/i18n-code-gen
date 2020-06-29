@@ -199,7 +199,7 @@ fn build_method_params(key: &Key) -> Result<(Vec<Placeholder>, Vec<Param>)> {
         .into_iter()
         .collect::<Vec<_>>();
 
-    placeholders.sort_unstable_by_key(|p| p.name);
+    placeholders.sort_unstable_by_key(|p| p.name.clone());
 
     let method_params = placeholders
         .iter()
@@ -210,7 +210,7 @@ fn build_method_params(key: &Key) -> Result<(Vec<Placeholder>, Vec<Param>)> {
             }
             .to_string();
             Param {
-                name: Ident::new(placeholder.name),
+                name: Ident::new(&placeholder.name),
                 ty,
             }
         })
@@ -220,10 +220,10 @@ fn build_method_params(key: &Key) -> Result<(Vec<Placeholder>, Vec<Param>)> {
 }
 
 #[derive(Debug, Hash, Eq, PartialEq, Ord, PartialOrd)]
-pub struct Placeholder<'a> {
-    name: &'a str,
+pub struct Placeholder {
+    name: String,
     kind: PlaceholderKind,
-    matched: &'a str,
+    matched: String,
 }
 
 #[derive(Debug, Hash, Eq, PartialEq, Ord, PartialOrd)]
@@ -244,7 +244,7 @@ impl FromStr for PlaceholderKind {
     }
 }
 
-pub fn find_placeholders<'a>(s: &'a str) -> Result<Vec<Placeholder<'a>>> {
+pub fn find_placeholders(s: &str) -> Result<Vec<Placeholder>> {
     lazy_static::lazy_static! {
         static ref RE: Regex = Regex::new(
             r#"\[%([si]):([^\]]+)\]"#
@@ -258,12 +258,14 @@ pub fn find_placeholders<'a>(s: &'a str) -> Result<Vec<Placeholder<'a>>> {
             let name = caps
                 .get(2)
                 .ok_or_else(|| Error::msg("placeholder regex didn't match"))?
-                .as_str();
+                .as_str()
+                .to_mixed_case();
 
             let matched = caps
                 .get(0)
                 .ok_or_else(|| Error::msg("placeholder regex didn't match"))?
-                .as_str();
+                .as_str()
+                .to_string();
 
             Ok(Placeholder {
                 name,
@@ -281,7 +283,7 @@ fn build_translated_value_with_interpolations(
     let mut translation = translation.to_string();
     for placeholder in placeholders {
         translation =
-            translation.replace(placeholder.matched, &format!("${{{}}}", placeholder.name));
+            translation.replace(&placeholder.matched, &format!("${{{}}}", placeholder.name));
     }
 
     Expr::StrLit {
