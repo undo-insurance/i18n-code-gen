@@ -17,18 +17,35 @@ use std::{
     path::{Path, PathBuf},
     process::exit,
 };
+use structopt::StructOpt;
 use tokio::stream::StreamExt;
 use tokio::{
     fs::{self, File},
-    io::AsyncWriteExt,
+    io::{AsyncWrite, AsyncWriteExt},
     runtime::Runtime,
     task,
     time::{delay_for, Duration},
 };
 
+/// Download translations from Lokalise and generate Scala code.
+#[derive(Debug, StructOpt)]
+struct Opt {
+    /// Print the code to stdout rather than a file.
+    #[structopt(long = "stdout", short = "s")]
+    print_to_stdout: bool,
+
+    /// Your Lokalise API token.
+    ///
+    /// If not set it'll use the `LOKALISE_API_TOKEN` environment variable.
+    #[structopt(long = "token", short = "t")]
+    api_token: Option<String>,
+}
+
 fn main() -> Result<()> {
+    let opt = Opt::from_args();
+
     let result = std::panic::catch_unwind(|| {
-        Runtime::new()?.block_on(async_main())?;
+        Runtime::new()?.block_on(async_main(opt))?;
         Result::<_>::Ok(())
     });
 
@@ -39,6 +56,7 @@ fn main() -> Result<()> {
             Ok(()) => {}
             Err(err) => {
                 eprintln!("{}", err);
+                eprintln!("{}", err.backtrace());
                 exit(1);
             }
         },
@@ -50,10 +68,7 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-async fn async_main() -> Result<()> {
-    let path = path_to_write_to().await?.join("shared/src/main/scala/dk/undo/i18n/I18n.scala");
-    let mut file = File::create(path).await?;
-
+async fn async_main(opt: Opt) -> Result<()> {
     ctrlc::set_handler(move || {
         execute!(io::stderr(), Show).ok();
         std::process::exit(1);
@@ -62,15 +77,45 @@ async fn async_main() -> Result<()> {
 
     show_spinner();
 
-    let client = LokaliseClient::new();
+    if opt.print_to_stdout {
+        let stdout = tokio::io::stdout();
+        gen_code_and_write_to(opt, stdout).await?;
+    } else {
+        let path = path_to_write_to()
+            .await?
+            .join("shared/src/main/scala/dk/undo/i18n/I18n.scala");
+        let file = File::create(path).await?;
+        gen_code_and_write_to(opt, file).await?;
+    }
 
-    let project = find_undo_project(&client).await?;
-    let keys = client.keys(&project).await?;
+    Ok(())
+}
 
-    let code = generate_code(keys)?;
+async fn gen_code_and_write_to<W>(opt: Opt, mut out: W) -> Result<()>
+where
+    W: AsyncWrite + Unpin,
+{
+    let api_token = if let Some(api_token) = opt.api_token {
+        api_token
+    } else {
+        std::env::var("LOKALISE_API_TOKEN").expect("LOKALISE_API_TOKEN is not set")
+    };
+
+    let client = LokaliseClient::new(api_token);
+
+    // Lokalise's API doesn't support concurrent requests using the same API token...
+    // So don't bother making these requests in parallel.
+
+    let undo_project = find_project("Undo", &client).await?;
+    let undo_keys = client.keys(&undo_project).await?;
+
+    let car_project = find_project("Car", &client).await?;
+    let car_keys = client.keys(&car_project).await?;
+
+    let code = generate_code(vec![(undo_project, undo_keys), (car_project, car_keys)])?;
     execute!(io::stderr(), Clear(ClearType::CurrentLine))?;
 
-    file.write_all(code.as_bytes()).await?;
+    out.write_all(code.as_bytes()).await?;
 
     Result::<_>::Ok(())
 }
@@ -111,13 +156,13 @@ async fn is_root_of_backend(path: &Path) -> Result<bool> {
     Ok(contains_git && contains_build_sbt)
 }
 
-async fn find_undo_project(client: &LokaliseClient) -> Result<Project> {
+async fn find_project(name: &str, client: &LokaliseClient) -> Result<Project> {
     let project = client
         .projects()
         .await?
         .into_iter()
-        .find(|project| project.name == "Undo")
-        .ok_or_else(|| Error::msg("Couldn't find Undo project"))?;
+        .find(|project| project.name == name)
+        .ok_or_else(|| Error::msg(format!("Couldn't find {} project", name)))?;
     Ok(project)
 }
 

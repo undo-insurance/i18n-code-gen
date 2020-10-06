@@ -76,7 +76,10 @@ pub struct Ident {
 }
 
 impl Ident {
-    pub fn new(name: &str) -> Self {
+    pub fn new<S>(name: S) -> Self
+    where
+        S: ToString,
+    {
         Self {
             name: name.to_string(),
         }

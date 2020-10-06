@@ -1,7 +1,6 @@
 use anyhow::Result;
 use reqwest::{Client, Url};
 use serde::{de::DeserializeOwned, Deserialize};
-use std::env;
 
 #[derive(Debug)]
 pub struct LokaliseClient {
@@ -10,9 +9,7 @@ pub struct LokaliseClient {
 }
 
 impl LokaliseClient {
-    pub fn new() -> Self {
-        let api_token = env::var("LOKALISE_API_TOKEN").expect("LOKALISE_API_TOKEN is not set");
-
+    pub fn new(api_token: String) -> Self {
         Self {
             api_token,
             client: Client::new(),
@@ -72,15 +69,30 @@ impl LokaliseClient {
     where
         T: DeserializeOwned,
     {
-        let resp = self
+        let json = self
             .client
-            .get(url)
+            .get(url.clone())
             .header("x-api-token", &self.api_token)
             .send()
             .await?
-            .json()
+            .json::<serde_json::Value>()
             .await?;
-        Ok(resp)
+
+        match serde_json::from_value(json.clone()) {
+            Ok(out) => Ok(out),
+            Err(err) => {
+                eprintln!("Failed to decode response from Lokalise");
+                eprintln!("URL = {}", url);
+                eprintln!(
+                    "Response = {}",
+                    serde_json::to_string_pretty(&json).unwrap()
+                );
+                eprintln!("API token = {}", self.api_token);
+                eprintln!("-------------");
+
+                Err(err.into())
+            }
+        }
     }
 }
 

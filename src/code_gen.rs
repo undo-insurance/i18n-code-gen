@@ -1,3 +1,4 @@
+use crate::lokalise_client::Project;
 use crate::{lokalise_client::Key, scala_ast::*};
 use anyhow::{Error, Result};
 use heck::{CamelCase, MixedCase, TitleCase};
@@ -5,11 +6,19 @@ use regex::Regex;
 use serde::Deserialize;
 use std::{collections::HashSet, str::FromStr};
 
-pub fn generate_code(keys: Vec<Key>) -> Result<String> {
-    let mut items = hardcoded_items();
+pub fn generate_code(projects: Vec<(Project, Vec<Key>)>) -> Result<String> {
+    let mut items = Vec::new();
+
+    items.push(Item::Comment(Comment::new("format: off")));
+
+    items.extend(hardcoded_items());
+
+    let all_keys = projects
+        .iter()
+        .flat_map(|(_, keys)| keys)
+        .collect::<Vec<_>>();
 
     items.extend(vec![
-        Item::Comment(Comment::new("format: off")),
         Item::Trait {
             name: "Locale".to_string(),
             sealed: true,
@@ -17,29 +26,41 @@ pub fn generate_code(keys: Vec<Key>) -> Result<String> {
         Item::Object {
             case: false,
             name: "Locale".to_string(),
-            items: locale_enum_variants(&keys),
+            items: locale_enum_variants(&all_keys),
             methods: vec![],
             super_type: None,
         },
     ]);
 
-    let methods = translation_methods(&keys)?;
-    items.extend(vec![
-        Item::Object {
-            case: false,
-            name: "I18n".to_string(),
-            items: vec![],
-            methods,
-            super_type: None,
-        },
-        Item::Comment(Comment::new("format: off")),
-    ]);
+    let items_inside_i18n_obj = projects
+        .into_iter()
+        .map(|(project, keys)| {
+            let methods = translation_methods(&keys)?;
+            Ok(Item::Object {
+                case: false,
+                name: project.name.to_mixed_case(),
+                items: vec![],
+                methods,
+                super_type: None,
+            })
+        })
+        .collect::<Result<Vec<_>>>()?;
+
+    items.extend(vec![Item::Object {
+        case: false,
+        name: "I18n".to_string(),
+        items: items_inside_i18n_obj,
+        methods: vec![],
+        super_type: None,
+    }]);
+
+    items.push(Item::Comment(Comment::new("format: on")));
 
     let ast = TopLevel { items };
     Ok(to_code(ast))
 }
 
-fn locale_enum_variants(keys: &[Key]) -> Vec<Item> {
+fn locale_enum_variants(keys: &[&Key]) -> Vec<Item> {
     let locales = find_locales(keys);
 
     locales
@@ -54,9 +75,9 @@ fn locale_enum_variants(keys: &[Key]) -> Vec<Item> {
         .collect()
 }
 
-fn find_locales(keys: &[Key]) -> Vec<&str> {
+fn find_locales<'a>(keys: &[&'a Key]) -> Vec<&'a str> {
     let mut names = keys
-        .into_iter()
+        .iter()
         .flat_map(|key| &key.translations)
         .map(|translation| translation.language_iso.as_str())
         .collect::<HashSet<_>>()
@@ -67,7 +88,7 @@ fn find_locales(keys: &[Key]) -> Vec<&str> {
 }
 
 fn translation_methods(keys: &[Key]) -> Result<Vec<MethodDef>> {
-    keys.iter().map(translation_method).collect()
+    keys.iter().map(|key| translation_method(key)).collect()
 }
 
 fn translation_method(key: &Key) -> Result<MethodDef> {
@@ -127,8 +148,9 @@ fn translation_method_with_cardinality(key: &Key) -> Result<MethodDef> {
         })
         .collect::<Result<Vec<_>>>()?;
 
+    let name = Ident::new(key.key_name.ios.to_mixed_case());
     Ok(MethodDef {
-        name: Ident::new(&key.key_name.ios.to_mixed_case()),
+        name,
         params: method_params,
         implicit_params: vec![Param {
             name: Ident::new("locale"),
@@ -162,8 +184,10 @@ fn translation_method_without_cardinality(key: &Key) -> Result<MethodDef> {
         })
         .collect::<Vec<_>>();
 
+    let name = Ident::new(key.key_name.ios.to_mixed_case());
+
     Ok(MethodDef {
-        name: Ident::new(&key.key_name.ios.to_mixed_case()),
+        name,
         params: method_params,
         implicit_params: vec![Param {
             name: Ident::new("locale"),
