@@ -56,7 +56,6 @@ fn main() -> Result<()> {
             Ok(()) => {}
             Err(err) => {
                 eprintln!("{}", err);
-                eprintln!("{}", err.backtrace());
                 exit(1);
             }
         },
