@@ -106,13 +106,16 @@ where
     // Lokalise's API doesn't support concurrent requests using the same API token...
     // So don't bother making these requests in parallel.
 
-    let undo_project = find_project("Undo", &client).await?;
-    let undo_keys = client.keys(&undo_project).await?;
+    let projects = vec!["Undo", "Car"];
 
-    let car_project = find_project("Car", &client).await?;
-    let car_keys = client.keys(&car_project).await?;
+    let mut project_and_keys = Vec::new();
+    for name in projects {
+        let project = find_project(name, &client).await?;
+        let keys = client.keys(&project).await?;
+        project_and_keys.push((project, keys));
+    }
 
-    let code = generate_code(vec![(undo_project, undo_keys), (car_project, car_keys)])?;
+    let code = generate_code(project_and_keys)?;
     execute!(io::stderr(), Clear(ClearType::CurrentLine))?;
 
     out.write_all(code.as_bytes()).await?;
